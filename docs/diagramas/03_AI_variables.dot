@@ -1,0 +1,15 @@
+digraph AI {
+  rankdir=LR;
+  graph [bgcolor="white", pad="0.25", nodesep="0.55", ranksep="0.65"];
+  node [shape=circle, fontname="Arial", fontsize=12];
+  edge [fontname="Arial", fontsize=10];
+  start [shape=point, label=""];
+  i0 [label="iInicio"];
+  i1 [shape=doublecircle, label="iIdent"];
+  qE [label="qE: error"];
+  start -> i0;
+  i0 -> i1 [label="A-Z | a-z"];
+  i1 -> i1 [label="A-Z | a-z | 0-9 | _"];
+  i0 -> qE [label="otro"];
+  qE -> qE [label="cualquier caracter"];
+}

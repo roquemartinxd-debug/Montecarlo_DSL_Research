@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monte Carlo DSL</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Compilador y simulador</p>
+      <h1>Monte Carlo DSL</h1>
+    </div>
+    <div class="connection-state" id="connectionState" aria-live="polite">Listo</div>
+  </header>
+
+  <main class="app-grid">
+    <section class="panel editor-panel" aria-labelledby="editorTitle">
+      <div class="panel-heading">
+        <div>
+          <h2 id="editorTitle">Modelo</h2>
+          <p>Escribe el modelo con la sintaxis LaTeX permitida por el DSL.</p>
+        </div>
+        <div class="execution-controls">
+          <label class="seed-control" for="seedInput">
+            <span>Semilla (opcional)</span>
+            <input id="seedInput" type="text" inputmode="numeric" autocomplete="off" maxlength="39" placeholder="Vacío = automática" aria-label="Semilla opcional para reproducir la simulación">
+          </label>
+          <div class="actions">
+            <button class="button button-primary" id="runButton" type="button">Ejecutar</button>
+            <button class="button button-danger" id="cancelButton" type="button" disabled>Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="editor-shell">
+        <pre class="line-numbers" id="lineNumbers" aria-hidden="true">1</pre>
+        <textarea id="sourceEditor" class="source-editor" wrap="off" spellcheck="false" aria-label="Código del modelo">\model{resultado=\frac{-coef_b\pm\sqrt{coef_b^2-4coef_a coef_c}}{2coef_a}}
+\normal coef_a{10,0.5}
+\distrib coef_b{{10,0.5},{15,0.3},{20,0.2}}
+\uniform coef_c{-20,30}
+\iter{1000000}
+\response{avg,min,max}</textarea>
+      </div>
+
+      <div class="diagnostics" id="diagnostics" aria-live="polite" hidden>
+        <h3>Diagnósticos</h3>
+        <div id="diagnosticList"></div>
+      </div>
+    </section>
+
+    <section class="panel results-panel" aria-labelledby="resultsTitle">
+      <div class="panel-heading results-heading">
+        <div>
+          <h2 id="resultsTitle">Simulación</h2>
+          <p id="statusMessage" aria-live="polite">Sin ejecución activa.</p>
+        </div>
+        <div class="job-meta">
+          <span>Semilla</span>
+          <strong id="seedValue">—</strong>
+        </div>
+      </div>
+
+      <div class="progress-block">
+        <div class="progress-labels">
+          <span>Progreso</span>
+          <strong id="progressText">0%</strong>
+        </div>
+        <progress id="progressBar" max="1" value="0">0%</progress>
+      </div>
+
+      <div class="counters">
+        <div><span>Iteraciones</span><strong id="iterationsValue">0 / 0</strong></div>
+        <div><span>Candidatos</span><strong id="candidateValue">0</strong></div>
+        <div><span>Válidos totales</span><strong id="validValue">0</strong></div>
+        <div><span>Descartados totales</span><strong id="discardedValue">0</strong></div>
+        <div><span>Workers</span><strong id="workersValue">—</strong></div>
+      </div>
+
+      <div class="branch-controls" id="branchControls" hidden>
+        <label for="branchSelect">
+          <span>Rama analizada</span>
+          <select id="branchSelect" aria-label="Seleccionar rama del operador más/menos"></select>
+        </label>
+        <p>Las ramas generadas por <code>\pm</code> conservan estadísticos e histogramas independientes.</p>
+      </div>
+
+      <div class="branch-summary" id="branchSummary" hidden>
+        <article><span>Válidos de la rama</span><strong id="branchValid">0</strong></article>
+        <article><span>Descartados de la rama</span><strong id="branchDiscarded">0</strong></article>
+        <article><span>MCSE de la media</span><strong id="branchMcse">—</strong></article>
+        <article><span>IC 95 % de la media</span><strong id="branchCi95">—</strong></article>
+      </div>
+
+      <div class="stats-grid" id="statsGrid" aria-label="Estadísticos solicitados">
+        <article class="stat-card" data-stat="avg" hidden>
+          <span>Promedio</span>
+          <strong id="statAvg">—</strong>
+        </article>
+        <article class="stat-card" data-stat="min" hidden>
+          <span>Mínimo</span>
+          <strong id="statMin">—</strong>
+        </article>
+        <article class="stat-card" data-stat="max" hidden>
+          <span>Máximo</span>
+          <strong id="statMax">—</strong>
+        </article>
+      </div>
+
+      <div class="chart-header">
+        <div>
+          <h3>Histograma acumulado de la rama seleccionada</h3>
+          <p>Se actualiza con cada lote recibido por WebSocket.</p>
+        </div>
+        <strong id="histogramCount">0 observaciones</strong>
+      </div>
+
+      <div class="chart-shell">
+        <svg id="histogram" viewBox="0 0 960 420" role="img" aria-label="Histograma de resultados de la simulación"></svg>
+        <div class="empty-chart" id="emptyChart">El histograma aparecerá cuando lleguen resultados.</div>
+      </div>
+
+      <div class="runtime-message" id="runtimeMessage" aria-live="polite" hidden></div>
+    </section>
+  </main>
+
+  <script src="/static/vendor/d3.v3.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
