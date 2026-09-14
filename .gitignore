@@ -29,3 +29,5 @@ build/
 dist/
 *.egg-info/
 src/*.egg-info/
+# Pytest local temp
+.pytest_tmp/
