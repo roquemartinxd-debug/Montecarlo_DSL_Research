@@ -126,6 +126,14 @@
     if (Object.prototype.hasOwnProperty.call(stats, "avg")) document.getElementById("statAvg").textContent = formatNumber(stats.avg);
     if (Object.prototype.hasOwnProperty.call(stats, "min")) document.getElementById("statMin").textContent = formatNumber(stats.min);
     if (Object.prototype.hasOwnProperty.call(stats, "max")) document.getElementById("statMax").textContent = formatNumber(stats.max);
+    if (Object.prototype.hasOwnProperty.call(stats, "var")) document.getElementById("statVar").textContent = formatNumber(stats.var);
+    if (Object.prototype.hasOwnProperty.call(stats, "std")) document.getElementById("statStd").textContent = formatNumber(stats.std);
+    if (Object.prototype.hasOwnProperty.call(stats, "count")) document.getElementById("statCount").textContent = formatInteger(stats.count);
+    if (Object.prototype.hasOwnProperty.call(stats, "valid_rate")) document.getElementById("statValidRate").textContent = formatNumber(stats.valid_rate);
+    if (Object.prototype.hasOwnProperty.call(stats, "discard_rate")) document.getElementById("statDiscardRate").textContent = formatNumber(stats.discard_rate);
+    if (Object.prototype.hasOwnProperty.call(stats, "p05")) document.getElementById("statP05").textContent = formatNumber(stats.p05);
+    if (Object.prototype.hasOwnProperty.call(stats, "p50")) document.getElementById("statP50").textContent = formatNumber(stats.p50);
+    if (Object.prototype.hasOwnProperty.call(stats, "p95")) document.getElementById("statP95").textContent = formatNumber(stats.p95);
   }
 
   function resetResults() {
@@ -138,7 +146,7 @@
     seedValue.textContent = "—";
     histogramCount.textContent = "0 observaciones";
     setRequestedStatistics([]);
-    ["statAvg", "statMin", "statMax"].forEach(function (id) {
+    ["statAvg", "statMin", "statMax", "statVar", "statStd", "statCount", "statValidRate", "statDiscardRate", "statP05", "statP50", "statP95"].forEach(function (id) {
       document.getElementById(id).textContent = "—";
     });
     runtimeMessage.hidden = true;

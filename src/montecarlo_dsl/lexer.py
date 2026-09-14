@@ -49,7 +49,17 @@ _STATISTICS: dict[str, TokenType] = {
     "avg": TokenType.AVG,
     "min": TokenType.MIN,
     "max": TokenType.MAX,
+    "var": TokenType.VAR,
+    "std": TokenType.STD,
+    "count": TokenType.COUNT,
+    "valid_rate": TokenType.VALID_RATE,
+    "discard_rate": TokenType.DISCARD_RATE,
+    "p05": TokenType.P05,
+    "p50": TokenType.P50,
+    "p95": TokenType.P95,
 }
+
+_STATISTICS_DESCRIPTION = ", ".join(_STATISTICS)
 
 _NUMBER_DELIMITERS = set("{} ,=+-*/^\\\t\n\r")
 
@@ -165,7 +175,7 @@ class Lexer:
             self._scan_whitespace()
             return None
 
-        if ch in {"a", "m"}:
+        if _is_ascii_letter(ch):
             return self._scan_statistic()
 
         if ch in {",", "}"}:
@@ -353,7 +363,7 @@ class Lexer:
 
         self._raise(
             "LEX007",
-            "Estadistico desconocido. Solo se permiten avg, min y max.",
+            "Estadistico desconocido. Permitidos: " + _STATISTICS_DESCRIPTION + ".",
             span=SourceSpan(start, self._position_after_candidate()),
             lexeme=self._response_word_fragment(),
         )
@@ -439,7 +449,7 @@ class Lexer:
 
     def _response_word_fragment(self) -> str:
         end = self._offset
-        while end < len(self.source) and _is_ascii_letter(self.source[end]):
+        while end < len(self.source) and _is_identifier_continue(self.source[end]):
             end += 1
         if end == self._offset:
             end = min(self._offset + 1, len(self.source))
@@ -447,7 +457,7 @@ class Lexer:
 
     def _position_after_candidate(self) -> SourcePosition:
         end = self._offset
-        while end < len(self.source) and _is_ascii_letter(self.source[end]):
+        while end < len(self.source) and _is_identifier_continue(self.source[end]):
             end += 1
         return SourcePosition(self._line, self._column + (end - self._offset), end)
 

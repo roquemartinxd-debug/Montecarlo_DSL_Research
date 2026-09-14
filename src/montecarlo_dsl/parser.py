@@ -50,6 +50,14 @@ _STATISTICS = {
     TokenType.AVG: Statistic.AVG,
     TokenType.MIN: Statistic.MIN,
     TokenType.MAX: Statistic.MAX,
+    TokenType.VAR: Statistic.VAR,
+    TokenType.STD: Statistic.STD,
+    TokenType.COUNT: Statistic.COUNT,
+    TokenType.VALID_RATE: Statistic.VALID_RATE,
+    TokenType.DISCARD_RATE: Statistic.DISCARD_RATE,
+    TokenType.P05: Statistic.P05,
+    TokenType.P50: Statistic.P50,
+    TokenType.P95: Statistic.P95,
 }
 
 
@@ -240,8 +248,8 @@ class Parser:
         if statistic is None:
             self._error(
                 code="SYN030",
-                message="Se esperaba uno de los estadisticos avg, min o max.",
-                expected=("AVG", "MIN", "MAX"),
+                message="Se esperaba un estadistico valido dentro de \response.",
+                expected=tuple(token.name for token in _STATISTICS),
             )
         self._advance()
         return statistic

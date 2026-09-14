@@ -33,6 +33,14 @@ class Statistic(Enum):
     AVG = "avg"
     MIN = "min"
     MAX = "max"
+    VAR = "var"
+    STD = "std"
+    COUNT = "count"
+    VALID_RATE = "valid_rate"
+    DISCARD_RATE = "discard_rate"
+    P05 = "p05"
+    P50 = "p50"
+    P95 = "p95"
 
 
 @dataclass(frozen=True, slots=True)

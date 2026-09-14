@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "montecarlo-dsl"
-version = "1.1.0"
+version = "1.2.0"
 description = "Monte Carlo DSL compiler, concurrent NumPy runtime generator, and FastAPI/WebSocket backend"
 requires-python = ">=3.10"
 dependencies = ["numpy>=2.0", "fastapi>=0.115", "uvicorn[standard]>=0.30"]

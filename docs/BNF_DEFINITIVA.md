@@ -124,3 +124,16 @@ Python no se incorpora de manera literal al script generado.
 - La multiplicacion implicita permite un factor no numerico a la derecha. Con identificadores de varias posiciones, `2precio` representa `2 * precio`, mientras que `precio2` representa un unico identificador. Para multiplicar dos variables sin ambiguedad se recomienda `precio*demanda`.
 - Un grupo con llaves afecta la precedencia pero no crea un nodo AST independiente.
 - La duplicacion de estadisticos y el limite de un solo `\pm` se validan en la fase semantica, no en el parser.
+
+## Extension v1.2.0 de `\response`
+
+La version 1.2.0 mantiene `avg`, `min` y `max`, y agrega estadisticos para validacion
+publicable:
+
+```text
+<ESTADISTICO> ::= AVG | MIN | MAX | VAR | STD | COUNT | VALID_RATE | DISCARD_RATE | P05 | P50 | P95
+```
+
+Donde `min` y `max` representan extremos muestrales observados. `valid_rate` y
+`discard_rate` se calculan sobre resultados candidatos de cada rama. `p05`, `p50` y
+`p95` son cuantiles muestrales.

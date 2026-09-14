@@ -41,7 +41,7 @@
 \distrib coef_b{{10,0.5},{15,0.3},{20,0.2}}
 \uniform coef_c{-20,30}
 \iter{1000000}
-\response{avg,min,max}</textarea>
+\response{avg,std,count,valid_rate,discard_rate,p05,p50,p95}</textarea>
       </div>
 
       <div class="diagnostics" id="diagnostics" aria-live="polite" hidden>
@@ -99,12 +99,44 @@
           <strong id="statAvg">—</strong>
         </article>
         <article class="stat-card" data-stat="min" hidden>
-          <span>Mínimo</span>
+          <span>Mínimo muestral</span>
           <strong id="statMin">—</strong>
         </article>
         <article class="stat-card" data-stat="max" hidden>
-          <span>Máximo</span>
+          <span>Máximo muestral</span>
           <strong id="statMax">—</strong>
+        </article>
+        <article class="stat-card" data-stat="var" hidden>
+          <span>Varianza muestral</span>
+          <strong id="statVar">—</strong>
+        </article>
+        <article class="stat-card" data-stat="std" hidden>
+          <span>Desviación estándar</span>
+          <strong id="statStd">—</strong>
+        </article>
+        <article class="stat-card" data-stat="count" hidden>
+          <span>Conteo válido</span>
+          <strong id="statCount">—</strong>
+        </article>
+        <article class="stat-card" data-stat="valid_rate" hidden>
+          <span>Tasa válida</span>
+          <strong id="statValidRate">—</strong>
+        </article>
+        <article class="stat-card" data-stat="discard_rate" hidden>
+          <span>Tasa descartada</span>
+          <strong id="statDiscardRate">—</strong>
+        </article>
+        <article class="stat-card" data-stat="p05" hidden>
+          <span>Percentil 5</span>
+          <strong id="statP05">—</strong>
+        </article>
+        <article class="stat-card" data-stat="p50" hidden>
+          <span>Mediana</span>
+          <strong id="statP50">—</strong>
+        </article>
+        <article class="stat-card" data-stat="p95" hidden>
+          <span>Percentil 95</span>
+          <strong id="statP95">—</strong>
         </article>
       </div>
 
