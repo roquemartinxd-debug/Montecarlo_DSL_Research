@@ -44,3 +44,8 @@ benchmarks/results/raw/*.csv
 benchmarks/results/processed/*.csv
 benchmarks/results/raw/*.json
 benchmarks/results/processed/*.json
+# Generated benchmark and validation outputs
+benchmarks/results/raw/*
+benchmarks/results/processed/*
+!benchmarks/results/raw/.gitkeep
+!benchmarks/results/processed/.gitkeep
