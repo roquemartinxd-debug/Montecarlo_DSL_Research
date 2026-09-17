@@ -57,3 +57,10 @@ estructurado de cualquier salida auxiliar del subproceso.
 La suite global de la version 1.1.0 contiene **205 pruebas** e incluye contratos de
 separacion de ramas, MCSE/intervalos, aislamiento de stdout y compilacion previa al
 runtime.
+
+## Actualizacion v1.2.0
+
+El runtime generado usa un nucleo estadistico por lote y combinacion determinista por indice
+de lote para reducir sensibilidad al orden de finalizacion de procesos concurrentes. Tambien
+reporta metadatos de reproducibilidad, tasas de validos/descartes, intervalos Wilson y un
+bloque `paired` cuando el modelo contiene `\pm`.

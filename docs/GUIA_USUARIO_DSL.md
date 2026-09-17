@@ -167,3 +167,24 @@ interfaz. Guardarla junto con el modelo y la configuracion permite repetir la si
 \iter{1000000}
 \response{avg,min,max}
 ```
+
+## Estadisticos nuevos en v1.2.0
+
+`\response` puede solicitar:
+
+```text
+avg, min, max, var, std, count, valid_rate, discard_rate, p05, p50, p95
+```
+
+Ejemplo:
+
+```text
+\model{y=x}
+\normal x{10,2}
+\iter{100000}
+\response{avg,var,std,count,valid_rate,discard_rate,p05,p50,p95}
+```
+
+Si el modelo produce `NaN` o infinitos, esos resultados se descartan de los estimadores
+y se reportan mediante `discard_rate`. Por esa razon, cuando hay descartes, `avg`, `var`,
+`std` y los cuantiles corresponden solo a resultados finitos.

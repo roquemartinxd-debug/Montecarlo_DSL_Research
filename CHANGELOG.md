@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0 - 2026-09-14
+
+- Nuevo modulo `montecarlo_dsl.statistics` con acumulacion Welford, combinacion Chan-Golub-LeVeque e intervalo Wilson.
+- `\response` acepta `var`, `std`, `count`, `valid_rate`, `discard_rate`, `p05`, `p50` y `p95`.
+- El runtime generado reporta varianza muestral, MCSE, IC 95 % de la media, tasas de validos/descartes e intervalos Wilson.
+- `min` y `max` se documentan como extremos muestrales.
+- El operador `\pm` conserva ramas independientes y agrega estadistica pareada `plus - minus`.
+- Eventos `start` y `complete` incluyen metadatos de reproducibilidad.
+- Se agregan modelos analiticos y scripts de benchmark en `benchmarks/`.
+- Nueva documentacion metodologica para version publicable.
+
 ## 1.1.0 - 2026-08-31
 
 - Identificadores ampliados a `[A-Za-z][A-Za-z0-9_]*`.

@@ -2,18 +2,32 @@
 __pycache__/
 *.py[cod]
 *.pyo
+*$py.class
 
 # Virtual environments
 .venv/
 venv/
+env/
 
 # VS Code
 .vscode/
 
 # Test artifacts
 .pytest_cache/
+.pytest_tmp/
 .coverage
+coverage.xml
 htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+src/*.egg-info/
+
+# Environment variables
+.env
+.env.*
 
 # Logs
 *.log
@@ -24,10 +38,9 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
-# Build artifacts
-build/
-dist/
-*.egg-info/
-src/*.egg-info/
-# Pytest local temp
-.pytest_tmp/
+
+# Generated benchmark and validation outputs
+benchmarks/results/raw/*.csv
+benchmarks/results/processed/*.csv
+benchmarks/results/raw/*.json
+benchmarks/results/processed/*.json
