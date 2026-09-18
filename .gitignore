@@ -49,3 +49,10 @@ benchmarks/results/raw/*
 benchmarks/results/processed/*
 !benchmarks/results/raw/.gitkeep
 !benchmarks/results/processed/.gitkeep
+# Baseline comparison generated files
+benchmarks/baseline_results/runs/*.py
+benchmarks/baseline_results/runs/*.json
+benchmarks/baseline_results/generated/*
+# Generated baseline experiment files
+benchmarks/baseline_results/generated/
+benchmarks/baseline_results/runs/*.py
