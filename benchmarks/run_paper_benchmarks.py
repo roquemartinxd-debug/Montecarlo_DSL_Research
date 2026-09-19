@@ -25,6 +25,13 @@ from benchmarks.baselines.uniform_mean_manual import run as run_uniform
 from benchmarks.baselines.discrete_mean_manual import run as run_discrete
 from benchmarks.baselines.linear_combination_manual import run as run_linear
 
+from benchmarks.baselines.numpy_native import (
+    run_normal_mean as run_normal_native,
+    run_uniform_mean as run_uniform_native,
+    run_discrete_mean as run_discrete_native,
+    run_linear_combination as run_linear_native,
+)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -43,10 +50,14 @@ DEFAULT_ITERATIONS = [
 ]
 
 IMPLEMENTATIONS = [
-    "python_manual",
+    "numpy_native",
+    "python_reference",
     "dsl_full_w1",
     "dsl_full_w2",
 ]
+
+PRIMARY_BASELINE = "numpy_native"
+SECONDARY_BASELINE = "python_reference"
 
 DEFAULT_OUTPUT = (
     ROOT
@@ -59,24 +70,48 @@ DEFAULT_OUTPUT = (
 
 MODELS = {
     "normal_mean": {
-        "dsl": ROOT / "benchmarks" / "models" / "analytic" / "normal_mean.dsl",
-        "manual": run_normal,
+        "dsl": (
+            ROOT
+            / "benchmarks"
+            / "models"
+            / "analytic"
+            / "normal_mean.dsl"
+        ),
+        "reference": run_normal,
+        "native": run_normal_native,
     },
     "uniform_mean": {
-        "dsl": ROOT / "benchmarks" / "models" / "analytic" / "uniform_mean.dsl",
-        "manual": run_uniform,
+        "dsl": (
+            ROOT
+            / "benchmarks"
+            / "models"
+            / "analytic"
+            / "uniform_mean.dsl"
+        ),
+        "reference": run_uniform,
+        "native": run_uniform_native,
     },
     "discrete_mean": {
-        "dsl": ROOT / "benchmarks" / "models" / "analytic" / "discrete_mean.dsl",
-        "manual": run_discrete,
+        "dsl": (
+            ROOT
+            / "benchmarks"
+            / "models"
+            / "analytic"
+            / "discrete_mean.dsl"
+        ),
+        "reference": run_discrete,
+        "native": run_discrete_native,
     },
     "linear_combination": {
-        "dsl": ROOT
-        / "benchmarks"
-        / "models"
-        / "analytic"
-        / "linear_combination.dsl",
-        "manual": run_linear,
+        "dsl": (
+            ROOT
+            / "benchmarks"
+            / "models"
+            / "analytic"
+            / "linear_combination.dsl"
+        ),
+        "reference": run_linear,
+        "native": run_linear_native,
     },
 }
 
@@ -166,20 +201,21 @@ def parse_complete_event(stdout: str) -> dict:
     return complete
 
 
-def run_manual(
-    model: str,
+def run_python_baseline(
+    runner,
     iterations: int,
 ) -> dict:
 
-    runner = MODELS[model]["manual"]
-
     module_name = runner.__module__
+    function_name = runner.__name__
 
     code = (
         "import json;"
-        f"from {module_name} import run;"
-        f"result=run(seed={SIMULATION_SEED}, "
-        f"iterations={iterations});"
+        f"from {module_name} import {function_name};"
+        f"result={function_name}("
+        f"seed={SIMULATION_SEED},"
+        f"iterations={iterations}"
+        ");"
         "print(json.dumps(result))"
     )
 
@@ -203,8 +239,8 @@ def run_manual(
 
     if process.returncode != 0:
         raise RuntimeError(
-            f"Manual Python execution failed.\n"
-            f"Model: {model}\n"
+            "Python baseline execution failed.\n"
+            f"Function: {module_name}.{function_name}\n"
             f"Iterations: {iterations}\n"
             f"STDOUT:\n{process.stdout}\n"
             f"STDERR:\n{process.stderr}"
@@ -218,35 +254,12 @@ def run_manual(
 
     if not lines:
         raise RuntimeError(
-            "Manual Python process produced no output."
+            "Python baseline process produced no output."
         )
 
     result = json.loads(
         lines[-1]
     )
-
-    return {
-        "workers": "",
-        "compile_time_seconds": 0.0,
-        "execution_time_seconds": total_time,
-        "total_time_seconds": total_time,
-        "result_mean": result.get("mean"),
-        "result_variance": result.get("variance"),
-        "valid_rate": result.get("valid_rate"),
-        "discard_rate": result.get("discard_rate"),
-        "valid_count": result.get("count"),
-    }
-
-    runner = MODELS[model]["manual"]
-
-    start = time.perf_counter()
-
-    result = runner(
-        seed=SIMULATION_SEED,
-        iterations=iterations,
-    )
-
-    total_time = time.perf_counter() - start
 
     return {
         "workers": "",
@@ -343,22 +356,14 @@ def run_dsl(
 
     return {
         "workers": workers,
-        "compile_time_seconds":
-            compile_time,
-        "execution_time_seconds":
-            execution_time,
-        "total_time_seconds":
-            total_time,
-        "result_mean":
-            stats.get("avg"),
-        "result_variance":
-            stats.get("var"),
-        "valid_rate":
-            stats.get("valid_rate"),
-        "discard_rate":
-            stats.get("discard_rate"),
-        "valid_count":
-            stats.get("count"),
+        "compile_time_seconds": compile_time,
+        "execution_time_seconds": execution_time,
+        "total_time_seconds": total_time,
+        "result_mean": stats.get("avg"),
+        "result_variance": stats.get("var"),
+        "valid_rate": stats.get("valid_rate"),
+        "discard_rate": stats.get("discard_rate"),
+        "valid_count": stats.get("count"),
     }
 
 
@@ -368,9 +373,15 @@ def execute(
     iterations: int,
 ) -> dict:
 
-    if implementation == "python_manual":
-        return run_manual(
-            model,
+    if implementation == "numpy_native":
+        return run_python_baseline(
+            MODELS[model]["native"],
+            iterations,
+        )
+
+    if implementation == "python_reference":
+        return run_python_baseline(
+            MODELS[model]["reference"],
             iterations,
         )
 
@@ -389,8 +400,7 @@ def execute(
         )
 
     raise ValueError(
-        f"Unknown implementation: "
-        f"{implementation}"
+        f"Unknown implementation: {implementation}"
     )
 
 
@@ -406,60 +416,99 @@ def write_environment(
             datetime.now(
                 timezone.utc
             ).isoformat(),
+
         "git_commit":
             git_value(
                 "rev-parse",
                 "HEAD",
             ),
+
         "git_branch":
             git_value(
                 "branch",
                 "--show-current",
             ),
+
         "python_version":
             sys.version,
+
         "python_executable":
             sys.executable,
+
         "numpy_version":
             np.__version__,
+
         "platform":
             platform.platform(),
+
         "machine":
             platform.machine(),
+
         "processor":
             platform.processor(),
+
         "processor_identifier":
             os.environ.get(
                 "PROCESSOR_IDENTIFIER",
                 "",
             ),
+
         "logical_cpu_count":
             os.cpu_count(),
+
         "simulation_seed":
             SIMULATION_SEED,
+
         "schedule_seed":
             SCHEDULE_SEED,
+
         "batch_size":
             BATCH_SIZE,
+
         "histogram_bins":
             HISTOGRAM_BINS,
+
         "warmup_runs_per_configuration":
             warmups,
+
         "measured_runs_per_configuration":
             repetitions,
+
         "iterations":
             iterations,
+
         "implementations":
             IMPLEMENTATIONS,
+
+        "primary_baseline":
+            PRIMARY_BASELINE,
+
+        "secondary_baseline":
+            SECONDARY_BASELINE,
+
         "timing_scope":
-    (
-        "End-to-end latency. "
-        "Both the manual Python baseline "
-        "and generated DSL program execute "
-        "in fresh Python subprocesses. "
-        "DSL total time additionally includes "
-        "compilation and generated-script creation."
-    ),
+            (
+                "End-to-end latency. "
+                "The NumPy-native baseline, Python reference "
+                "baseline, and generated DSL program execute "
+                "in fresh Python subprocesses. "
+                "DSL total time additionally includes "
+                "DSL compilation and generated-script creation."
+            ),
+
+        "baseline_notes":
+            {
+                "numpy_native":
+                    (
+                        "Independent vectorized NumPy baseline. "
+                        "Does not import montecarlo_dsl."
+                    ),
+                "python_reference":
+                    (
+                        "Reference Python implementation using "
+                        "the project's RunningStats statistical core."
+                    ),
+            },
     }
 
     path = (
@@ -555,50 +604,66 @@ def run_blocks(
             row = {
                 "phase":
                     phase,
+
                 "block_index":
                     block_index,
+
                 "run_index":
                     run_index,
+
                 "schedule_position":
                     schedule_position,
+
                 "model":
                     model,
+
                 "iterations":
                     iterations,
+
                 "implementation":
                     implementation,
+
                 "workers":
                     result["workers"],
+
                 "simulation_seed":
                     SIMULATION_SEED,
+
                 "compile_time_seconds":
                     result[
                         "compile_time_seconds"
                     ],
+
                 "execution_time_seconds":
                     result[
                         "execution_time_seconds"
                     ],
+
                 "total_time_seconds":
                     result[
                         "total_time_seconds"
                     ],
+
                 "result_mean":
                     result[
                         "result_mean"
                     ],
+
                 "result_variance":
                     result[
                         "result_variance"
                     ],
+
                 "valid_rate":
                     result[
                         "valid_rate"
                     ],
+
                 "discard_rate":
                     result[
                         "discard_rate"
                     ],
+
                 "valid_count":
                     result[
                         "valid_count"
@@ -634,7 +699,10 @@ def create_summary(
             [],
         ).append(row)
 
-    manual_means = {}
+    baseline_means = {
+        PRIMARY_BASELINE: {},
+        SECONDARY_BASELINE: {},
+    }
 
     for (
         model,
@@ -642,10 +710,12 @@ def create_summary(
         implementation,
     ), rows in grouped.items():
 
-        if implementation != "python_manual":
+        if implementation not in baseline_means:
             continue
 
-        manual_means[
+        baseline_means[
+            implementation
+        ][
             (model, iterations)
         ] = statistics.mean(
             float(
@@ -660,7 +730,11 @@ def create_summary(
 
     for key in sorted(grouped):
 
-        model, iterations, implementation = key
+        (
+            model,
+            iterations,
+            implementation,
+        ) = key
 
         rows = grouped[key]
 
@@ -695,16 +769,42 @@ def create_summary(
             total_times
         )
 
-        manual_mean = manual_means[
+        numpy_native_mean = baseline_means[
+            PRIMARY_BASELINE
+        ][
             (model, iterations)
         ]
 
-        ratio = (
-            mean_total / manual_mean
+        python_reference_mean = baseline_means[
+            SECONDARY_BASELINE
+        ][
+            (model, iterations)
+        ]
+
+        ratio_vs_numpy_native = (
+            mean_total
+            / numpy_native_mean
         )
 
-        overhead_percent = (
-            (ratio - 1.0) * 100.0
+        ratio_vs_python_reference = (
+            mean_total
+            / python_reference_mean
+        )
+
+        overhead_vs_numpy_native = (
+            (
+                ratio_vs_numpy_native
+                - 1.0
+            )
+            * 100.0
+        )
+
+        overhead_vs_python_reference = (
+            (
+                ratio_vs_python_reference
+                - 1.0
+            )
+            * 100.0
         )
 
         workers = rows[0]["workers"]
@@ -713,20 +813,27 @@ def create_summary(
             {
                 "model":
                     model,
+
                 "iterations":
                     iterations,
+
                 "implementation":
                     implementation,
+
                 "workers":
                     workers,
+
                 "measured_runs":
                     len(rows),
+
                 "mean_total_time_seconds":
                     mean_total,
+
                 "median_total_time_seconds":
                     statistics.median(
                         total_times
                     ),
+
                 "std_total_time_seconds":
                     (
                         statistics.stdev(
@@ -735,22 +842,34 @@ def create_summary(
                         if len(total_times) > 1
                         else 0.0
                     ),
+
                 "min_total_time_seconds":
                     min(total_times),
+
                 "max_total_time_seconds":
                     max(total_times),
+
                 "mean_compile_time_seconds":
                     statistics.mean(
                         compile_times
                     ),
+
                 "mean_execution_time_seconds":
                     statistics.mean(
                         execution_times
                     ),
-                "ratio_vs_python_manual":
-                    ratio,
-                "overhead_percent_vs_python_manual":
-                    overhead_percent,
+
+                "ratio_vs_numpy_native":
+                    ratio_vs_numpy_native,
+
+                "overhead_percent_vs_numpy_native":
+                    overhead_vs_numpy_native,
+
+                "ratio_vs_python_reference":
+                    ratio_vs_python_reference,
+
+                "overhead_percent_vs_python_reference":
+                    overhead_vs_python_reference,
             }
         )
 
@@ -809,10 +928,36 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    if args.repetitions < 1:
+        raise ValueError(
+            "--repetitions must be >= 1"
+        )
+
+    if args.warmups < 0:
+        raise ValueError(
+            "--warmups must be >= 0"
+        )
+
+    if not args.iterations:
+        raise ValueError(
+            "At least one iteration count is required."
+        )
+
+    if any(
+        value < 1
+        for value in args.iterations
+    ):
+        raise ValueError(
+            "Iteration counts must be >= 1."
+        )
+
     output_dir = args.output_dir
 
     if not output_dir.is_absolute():
-        output_dir = ROOT / output_dir
+        output_dir = (
+            ROOT
+            / output_dir
+        )
 
     output_dir.mkdir(
         parents=True,
@@ -863,6 +1008,18 @@ def main() -> None:
         f"Expected process runs: "
         f"{expected_runs}"
     )
+
+    print(
+        f"Implementations: "
+        f"{', '.join(IMPLEMENTATIONS)}"
+    )
+
+    print(
+        f"Primary baseline: "
+        f"{PRIMARY_BASELINE}"
+    )
+
+    print()
 
     with raw_path.open(
         "w",
