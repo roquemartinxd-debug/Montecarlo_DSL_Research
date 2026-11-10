@@ -89,7 +89,7 @@ def test_generated_runtime_reports_extended_statistics_and_reproducibility_metad
     start = events[0]
     final = events[-1]
 
-    assert start["statistical_core_version"] == "1.2.0"
+    assert start["statistical_core_version"] == "1.3.1"
     assert start["metadata"]["nonfinite_policy"] == "discard_and_report"
     assert start["metadata"]["rng_bit_generator"]
     assert final["metadata"]["seed_strategy"].startswith("numpy.SeedSequence")
@@ -126,3 +126,25 @@ def test_plus_minus_runtime_reports_paired_delta_statistics(tmp_path):
     assert paired["stats"]["count"] == 120
     assert paired["stats"]["avg"] == pytest.approx(2.0)
     assert paired["diagnostics"]["mcse_mean"] == pytest.approx(0.0)
+    assert paired["histogram"]["total_count"] == paired["valid_results"]
+
+
+def test_bounded_streaming_histogram_rejects_unbounded_out_of_order_buffer():
+    from montecarlo_dsl.statistics import BlockHistogramSummary, BoundedStreamingHistogram
+
+    sketch = BoundedStreamingHistogram(max_pending_blocks=2)
+    summary = BlockHistogramSummary.from_array(np.array([1.0, 2.0]))
+    sketch.add_summary(2, summary)
+    sketch.add_summary(3, summary)
+    with pytest.raises(RuntimeError, match="max_pending_blocks"):
+        sketch.add_summary(4, summary)
+
+
+def test_bounded_streaming_histogram_drains_pending_blocks_when_frontier_arrives():
+    from montecarlo_dsl.statistics import BlockHistogramSummary, BoundedStreamingHistogram
+
+    sketch = BoundedStreamingHistogram(max_pending_blocks=2)
+    sketch.add_summary(1, BlockHistogramSummary.from_array(np.array([2.0])))
+    sketch.add_summary(0, BlockHistogramSummary.from_array(np.array([1.0])))
+    assert sketch.total_count == 2
+    assert len(sketch._pending_blocks) == 0

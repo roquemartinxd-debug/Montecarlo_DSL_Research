@@ -2,7 +2,25 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+import pydantic
+from pydantic import BaseModel as _PydanticBaseModel, Field
+
+try:
+    from pydantic import field_validator
+    _PYDANTIC_V2 = True
+except ImportError:
+    from pydantic import validator as _v1_validator
+    _PYDANTIC_V2 = False
+
+    def field_validator(*fields: str):
+        return _v1_validator(*fields, allow_reuse=True)
+
+
+class BaseModel(_PydanticBaseModel):
+    if not _PYDANTIC_V2:
+        def model_dump(self, *args, **kwargs):
+            return self.dict(*args, **kwargs)
+
 
 
 _MAX_SEED = (1 << 128) - 1

@@ -15,6 +15,7 @@ from .api_models import (
     JobStatusResponse,
 )
 from .compiler import compile_source
+from .cost_model import InterpretableASTCostModel
 from .diagnostics import CompilationError, Diagnostic
 from .generator import GeneratorConfig
 from .job_manager import JobManager
@@ -38,8 +39,13 @@ def _diagnostic_payload(diagnostic: Diagnostic) -> DiagnosticPayload:
     )
 
 
-def create_app(manager: JobManager | None = None) -> FastAPI:
-    job_manager = manager or JobManager()
+def create_app(
+    manager: JobManager | None = None,
+    cost_model: InterpretableASTCostModel | None = None,
+) -> FastAPI:
+    job_manager = manager or JobManager(cost_model=cost_model)
+    if cost_model is not None and job_manager.cost_model is None:
+        job_manager.cost_model = cost_model
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -49,10 +55,11 @@ def create_app(manager: JobManager | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Monte Carlo DSL Backend",
-        version="1.1.0",
+        version="1.3.1",
         lifespan=lifespan,
     )
 
+    app.state.job_manager = job_manager
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     @app.get("/", include_in_schema=False)
@@ -73,7 +80,7 @@ def create_app(manager: JobManager | None = None) -> FastAPI:
         manager: JobManager = request.app.state.job_manager
 
         try:
-            # Las fases LEX/SYN/SEM/GEN concluyen completamente antes de crear
+            # Las fases LEX/SYN/SEM/OPT/COST/GEN concluyen completamente antes de crear
             # el trabajo de ejecucion. Cualquier fallo de compilacion usa HTTP 422.
             compiled = compile_source(
                 payload.source,
@@ -82,7 +89,9 @@ def create_app(manager: JobManager | None = None) -> FastAPI:
                     max_workers=manager.max_workers,
                     histogram_bins=manager.histogram_bins,
                     seed=seed,
+                    scheduler_mode=manager.scheduler_mode,
                 ),
+                cost_model=manager.cost_model,
             )
             job = await manager.create_job(compiled)
         except CompilationError as exc:

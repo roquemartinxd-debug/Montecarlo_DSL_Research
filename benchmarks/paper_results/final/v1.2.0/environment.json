@@ -1,0 +1,37 @@
+{
+  "generated_at_utc": "2026-09-19T02:51:51.808399+00:00",
+  "git_commit": "53ec00f0af3a308900b17e00f948226d50b6ac2b",
+  "git_branch": "experiment/v1.2.0-paper-benchmarks",
+  "python_version": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "python_executable": "C:\\Users\\user\\Downloads\\Montecarlo_DSL_Research\\.venv\\Scripts\\python.exe",
+  "numpy_version": "2.5.3",
+  "platform": "Windows-11-10.0.22621-SP0",
+  "machine": "AMD64",
+  "processor": "AMD64 Family 21 Model 112 Stepping 0, AuthenticAMD",
+  "processor_identifier": "AMD64 Family 21 Model 112 Stepping 0, AuthenticAMD",
+  "logical_cpu_count": 2,
+  "simulation_seed": 101,
+  "schedule_seed": 120026,
+  "batch_size": 25000,
+  "histogram_bins": 30,
+  "warmup_runs_per_configuration": 2,
+  "measured_runs_per_configuration": 30,
+  "iterations": [
+    10000,
+    100000,
+    1000000
+  ],
+  "implementations": [
+    "numpy_native",
+    "python_reference",
+    "dsl_full_w1",
+    "dsl_full_w2"
+  ],
+  "primary_baseline": "numpy_native",
+  "secondary_baseline": "python_reference",
+  "timing_scope": "End-to-end latency. The NumPy-native baseline, Python reference baseline, and generated DSL program execute in fresh Python subprocesses. DSL total time additionally includes DSL compilation and generated-script creation.",
+  "baseline_notes": {
+    "numpy_native": "Independent vectorized NumPy baseline. Does not import montecarlo_dsl.",
+    "python_reference": "Reference Python implementation using the project's RunningStats statistical core."
+  }
+}

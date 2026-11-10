@@ -1,29 +1,24 @@
-# Monte Carlo DSL v1.2.0
+# Monte Carlo DSL v1.3.1
 
-Compilador DSL para simulaciones Monte Carlo con runtime NumPy concurrente, backend
-FastAPI/WebSocket e interfaz web local.
+Compilador DSL para simulaciones Monte Carlo con validacion semantica, generacion NumPy, planificacion adaptativa guiada por el AST y calibracion piloto, reproducibilidad independiente de la planificacion fisica (`Philox`), estadistica incremental, cuantiles aproximados mediante sketch ponderado y backend FastAPI/WebSocket.
 
-La version 1.2.0 esta orientada a preparar una version publicable: agrega nucleo
-estadistico estable, respuesta estadistica extendida, metadatos de reproducibilidad,
-validacion analitica y scripts de benchmark.
+La version **1.3.1** es una entrega de estabilizacion. Corrige el buffer multiproceso, limita buffers de reordenamiento, unifica el kernel del planificador, hace portable la medicion RSS, incorpora histogramas pareados y restringe el optimizador para respetar el redondeo float64. **No debe considerarse aun una version de envio a revista**: la campana experimental debe regenerarse despues de estos cambios.
 
-## Estado de la version
+## Estado de la versión
 
-- Version: **1.2.0**
-- Compilacion: LEX -> SYN -> AST -> SEM -> GEN antes de crear el trabajo runtime
-- Backend: FastAPI + JobManager
-- Runtime: script Python/NumPy generado desde un AST validado
-- Paralelismo: ProcessPoolExecutor
-- Streaming: WebSocket con eventos JSON prefijados con `MC_DSL_EVENT:`
-- Operador `\pm`: ramas `plus` y `minus` separadas y bloque adicional `paired`
-- Nucleo estadistico: media, varianza muestral, desviacion estandar, MCSE, IC 95 %, cuantiles y tasas de descarte
-- Reproducibilidad: semilla maestra, estrategia por lote con NumPy `SeedSequence` y metadatos de entorno
-- Persistencia productiva: ninguna; los benchmarks escriben artefactos CSV/JSONL locales
+- Version: **1.3.1** (Licencia MIT en [`LICENSE`](LICENSE), flujo CI en [`.github/workflows/ci.yml`](.github/workflows/ci.yml))
+- Pipeline de compilación: `LEX -> SYN -> AST -> SEM -> OPT (ASTOptimizer) -> COST (ASTCostFeatures) -> GEN` antes de crear el trabajo runtime
+- Optimizador del compilador (`optimizer.py`): *constant folding* en float64 para literales; no elimina identidades dinamicas como `x + 0` o `x * 1`, ni sustituye `sqrt`/potencias NumPy por aritmetica escalar Python
+- Modelo de coste (`cost_model.py`): proyección sobre **4 índices estructurales compuestos interpretables** (`intercept`, `distribution_cost_index`, `arithmetic_cost_index`, `transcendental_cost_index`; rango $= 4$, $\kappa_{\text{raw}} = 11.3601$, $\kappa_{\text{std}} = 3.4054$, $r_{\text{arith,trans}} = 0.8234$), calibrada mediante regresión Ridge restringida exacta (KKT) sobre 8 modelos de entrenamiento ($\text{MAPE}_{\text{AST}} = 12.35\%$ fuera de muestra, $\rho = 1.0000$), propagada al runtime y combinada con el bloque piloto $b = 0$ mediante contracción ponderada por tamaño muestral (*sample-size-weighted shrinkage*), logrando un **$\text{MAPE}_{\text{híbrido}} = 5.55\%$** (error mediano **`5.04%`**, $r = 0.9899$, $\rho = 1.0000$) fuera de muestra en 6 modelos no vistos
+- Planificador adaptativo (`scheduler.py`, `compiler.py`, `generator.py`): el mismo kernel puro se utiliza en el scheduler Python y en el runtime generado; los descriptores de tareas se generan perezosamente y el reordenamiento/futures se limita a ventanas de `2 * worker_count`, con ingesta final en orden canonico
+- Reproducibilidad: los bloques logicos determinan las secuencias `Philox`; las tareas fisicas se pueden enviar en distinto orden y sus resultados se reducen en orden canonico
+- Memoria: bajo tamano maximo de tarea, workers y ventana fijos, el modo `bounded` limita el buffer de reordenamiento y la carga retenida estimada; `peak_retained_coordinator_bytes` no es RSS. `sum_of_process_peak_rss_bytes` es suma de maximos por proceso, no pico simultaneo
+- Validacion local de esta correccion: 242/242 pruebas superadas en tres grupos con Python 3.13.5 y NumPy 2.3.5; la ejecucion monolitica excedio el limite del entorno y el runner Windows sigue pendiente
 
-## Inicio rapido
+## Inicio rápido
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 .\.venv\Scripts\python.exe -m pytest --basetemp=.pytest_tmp
@@ -32,55 +27,60 @@ py -3.12 -m venv .venv
 
 Abrir:
 
-- Aplicacion: `http://127.0.0.1:8000/`
+- Aplicación: `http://127.0.0.1:8000/`
 - Salud: `http://127.0.0.1:8000/api/health`
 - OpenAPI/Swagger: `http://127.0.0.1:8000/docs`
 
-El proyecto declara Python `>=3.10`.
+## Campana experimental v1.3.1 y generacion de tablas/figuras
 
-## Ejemplo de modelo
-
-```text
-\model{resultado=\frac{-coef_b\pm\sqrt{coef_b^2-4coef_a coef_c}}{2coef_a}}
-\normal coef_a{10,0.5}
-\distrib coef_b{{10,0.5},{15,0.3},{20,0.2}}
-\uniform coef_c{-20,30}
-\iter{1000000}
-\response{avg,std,count,valid_rate,discard_rate,p05,p50,p95}
+```bash
+python benchmarks/run_v1_3_experiments.py --confirmatory-reps 30 --pilot-reps 10 --ablation-reps 10
+python scripts/generate_v1_3_figures_tables.py
 ```
 
-## Estadisticos permitidos
+Los comandos regeneran resultados en `benchmarks/results/final/v1.3.1/`. Los resultados anteriores se conservan por separado:
 
-`\response` acepta:
+- Baseline historico v1.2.0: `benchmarks/results/final/v1.2.0/` (la comparacion en Exp. 0 es una emulacion de configuracion, no ejecucion del codigo original)
+- Resultados historicos v1.3.0: `benchmarks/results/final/v1.3.0/` (no reutilizar como resultados v1.3.1)
+- Resultados nuevos v1.3.1: `benchmarks/results/final/v1.3.1/` despues de ejecutar la campana
+- Tablas y figuras v1.3.1: generadas desde los CSV v1.3.1
 
-```text
-avg, min, max, var, std, count, valid_rate, discard_rate, p05, p50, p95
-```
+## Documentación clave
 
-Notas metodologicas:
+Empiece por [`docs/00_INDICE.md`](docs/00_INDICE.md). Para la defensa VAE y el artículo científico destacan:
 
-- `min` y `max` son extremos muestrales observados, no limites teoricos.
-- Si hay `NaN` o infinitos, se descartan de los estimadores y se reportan en `discard_rate`.
-- La media se interpreta como condicional sobre resultados finitos cuando existen descartes.
-- `ci95_mean` es una aproximacion normal de la media: `mean +/- 1.96 * MCSE`.
+- [`docs/paper/v1.3.1_manuscript.md`](docs/paper/v1.3.1_manuscript.md) — Borrador actualizado; cifras heredadas aun requieren revalidacion
+- [`docs/VAE_RNCP39278_ALIGNMENT.md`](docs/VAE_RNCP39278_ALIGNMENT.md) — Alineación rigurosa con los 7 bloques oficiales RNCP39278 (`BC01` a `BC07`)
+- [`docs/ADR_ARCHITECTURE_DECISIONS.md`](docs/ADR_ARCHITECTURE_DECISIONS.md) — Registros de decisiones arquitectónicas (ADR-001 a ADR-006)
+- [`docs/SCOPUS_PUBLICATION_STRATEGY.md`](docs/SCOPUS_PUBLICATION_STRATEGY.md) — Estrategia de publicación científica en Scopus y paquete de replicación
+- [`docs/baseline_v1.2.0_audit.md`](docs/baseline_v1.2.0_audit.md) — Auditoría y congelación de la línea base v1.2.0
+- [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md) — Garantías formales de reproducibilidad independiente de la planificación
+- [`docs/STATISTICAL_METHODS.md`](docs/STATISTICAL_METHODS.md) — Métodos estadísticos, memoria acotada bajo parametros fijos y cuantiles ponderados
+- [`docs/EXPERIMENTAL_PROTOCOL.md`](docs/EXPERIMENTAL_PROTOCOL.md) — Protocolo corregido y numero real de repeticiones por experimento
+- [`docs/REVALIDATION_REQUIRED_v1.3.1.md`](docs/REVALIDATION_REQUIRED_v1.3.1.md) — Lista de verificaciones pendientes antes de publicar
+- [`docs/VALIDATION_SUMMARY_v1.3.1_lazy_tasks.md`](docs/VALIDATION_SUMMARY_v1.3.1_lazy_tasks.md) — Resumen de los 242 tests y la correccion de generacion perezosa
 
-## Benchmarks y validacion
+## Campana experimental reanudable (v1.3.1 hotfix)
+
+El runner experimental guarda checkpoints por simulacion, permite continuar
+despues de un reinicio con `--resume` y detecta cambios de codigo, maquina,
+dependencias o numero de repeticiones. Los calentamientos se repiten.
 
 ```powershell
-python benchmarks/statistical_validation.py
-python benchmarks/run_benchmarks.py --quick
-python benchmarks/analyze_results.py
+python -u benchmarks/run_v1_3_experiments.py --confirmatory-reps 30 --pilot-reps 10 --ablation-reps 10
+# Si se interrumpe:
+python -u benchmarks/run_v1_3_experiments.py --confirmatory-reps 30 --pilot-reps 10 --ablation-reps 10 --resume
 ```
 
-Resultados:
+Consulta `docs/CHECKPOINT_RESUME_v1.3.1.md` para el procedimiento y las
+limitaciones de comparaciones de rendimiento entre sesiones.
 
-- `benchmarks/results/raw/`
-- `benchmarks/results/processed/`
+## Campaña complementaria AWS (Ubuntu 24.04, perfil de 4 núcleos)
 
-## Documentacion
+Para una segunda campaña aislada en EC2, consulta [`docs/AWS_CAMPAIGN_v1.3.1_UBUNTU_4CORE.md`](docs/AWS_CAMPAIGN_v1.3.1_UBUNTU_4CORE.md). El perfil `aws-4core` añade un baseline serial en proceso a Exp. 2 y una matriz de memoria con cuatro workers a Exp. 8; `--output-dir` y `--checkpoint-dir` separan completamente los resultados AWS de la campaña Windows. Las dependencias de comparación están fijadas en `requirements-aws-experiment.txt`.
 
-Empiece por [`docs/00_INDICE.md`](docs/00_INDICE.md). Para la version publicable son especialmente importantes:
+Paquete de código limpio para transferir desde Windows a EC2:
 
-- [`docs/STATISTICAL_METHODS.md`](docs/STATISTICAL_METHODS.md)
-- [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md)
-- [`docs/EXPERIMENTAL_PROTOCOL.md`](docs/EXPERIMENTAL_PROTOCOL.md)
+```powershell
+python scripts/package_aws_source.py --output .\dist\Montecarlo_DSL_Research_v1.3.1_aws_source.zip
+```

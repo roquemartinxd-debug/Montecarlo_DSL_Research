@@ -1,5 +1,8 @@
 # Release checklist - v1.1.0
 
+> **Estado v1.3.1 (2026-10-31):** estabilizacion de codigo, no liberacion cientifica final. 242/242 pruebas superadas por grupos en Linux/Python 3.13.5/NumPy 2.3.5; no publicar ni enviar el articulo hasta revalidar en PowerShell/Python 3.11, regenerar resultados y ejecutar CI en Linux/Windows.
+
+
 - [x] Version del paquete: 1.1.0.
 - [x] BNF sin no terminales equivalentes redundantes.
 - [x] Identificadores descriptivos implementados.

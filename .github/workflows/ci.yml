@@ -1,0 +1,41 @@
+name: Monte Carlo DSL CI
+
+on:
+  push:
+    branches: ["main", "master", "experiment/**"]
+  pull_request:
+
+jobs:
+  test-and-verify:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Verify environment versions
+        run: |
+          python -c "import sys, numpy, fastapi, pydantic; print('Python:', sys.version); print('NumPy:', numpy.__version__); print('FastAPI:', fastapi.__version__); print('Pydantic:', pydantic.__version__)"
+
+      - name: Run full automated test suite
+        run: |
+          python -m pytest --basetemp=.pytest_tmp -q
+
+      - name: Run RNG schedule-invariance smoke check
+        run: |
+          python benchmarks/rng_reproducibility.py --models normal_mean --iterations 100000 --repetitions 2 --output-dir .pytest_tmp/rng_smoke
