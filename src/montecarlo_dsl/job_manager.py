@@ -15,6 +15,10 @@ from typing import Any
 from uuid import uuid4
 
 from .compiler import CompiledSimulation
+from .cost_model import InterpretableASTCostModel
+
+
+_PACKAGE_SRC_ROOT = str(Path(__file__).resolve().parents[1])
 
 
 class JobStatus(str, Enum):
@@ -115,8 +119,17 @@ class Job:
             script_path.write_text(self.script, encoding="utf-8", newline="\n")
             self.script = ""
 
+            env = dict(os.environ)
+            existing_py_path = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = (
+                f"{_PACKAGE_SRC_ROOT}{os.pathsep}{existing_py_path}"
+                if existing_py_path
+                else _PACKAGE_SRC_ROOT
+            )
+
             process_kwargs: dict[str, Any] = {
                 "cwd": str(self.temp_dir),
+                "env": env,
                 "stdout": asyncio.subprocess.PIPE,
                 "stderr": asyncio.subprocess.PIPE,
             }
@@ -127,7 +140,6 @@ class Job:
 
             self.process = await asyncio.create_subprocess_exec(
                 sys.executable,
-                "-I",
                 "-u",
                 str(script_path),
                 **process_kwargs,
@@ -238,7 +250,6 @@ class Job:
                 pass
 
     async def _read_stderr(self, stream: asyncio.StreamReader) -> None:
-        # Se limita stderr para diagnostico interno del servidor.
         chunks: list[str] = []
         total = 0
         max_chars = 16_384
@@ -268,8 +279,6 @@ class Job:
         return event
 
     def _remember_stdout_diagnostic(self, line: str) -> None:
-        # Cualquier salida que no use el prefijo reservado queda fuera del protocolo
-        # estructurado y no puede interferir con los eventos consumidos por FastAPI.
         combined = (self.stdout_diagnostics_tail + "\n" + line).strip()
         self.stdout_diagnostics_tail = combined[-16_384:]
 
@@ -317,10 +326,20 @@ class Job:
 class JobManager:
     """Gestiona un unico trabajo Monte Carlo activo a la vez."""
 
-    def __init__(self, *, batch_size: int = 25_000, max_workers: int = 4, histogram_bins: int = 30):
+    def __init__(
+        self,
+        *,
+        batch_size: int = 25_000,
+        max_workers: int = 4,
+        histogram_bins: int = 30,
+        scheduler_mode: str = "hybrid",
+        cost_model: InterpretableASTCostModel | None = None,
+    ):
         self.batch_size = batch_size
         self.max_workers = max_workers
         self.histogram_bins = histogram_bins
+        self.scheduler_mode = scheduler_mode
+        self.cost_model = cost_model
         self.jobs: dict[str, Job] = {}
         self._active_job_id: str | None = None
         self._lock = asyncio.Lock()

@@ -44,7 +44,7 @@ valores discretos en `float64` se mantienen.
 
 - los lotes cubren exactamente `TOTAL_ITERATIONS`;
 - `workers = min(MAX_WORKERS, cantidad_de_lotes)`;
-- cada lote deriva su semilla de `MASTER_SEED` y del indice mediante BLAKE2b;
+- cada lote usa `numpy.SeedSequence([MASTER_SEED, batch_index])`; la identidad del worker no forma parte de la semilla;
 - se conserva la configuracion necesaria para repetir una ejecucion.
 
 ## Protocolo
@@ -61,6 +61,9 @@ runtime.
 ## Actualizacion v1.2.0
 
 El runtime generado usa un nucleo estadistico por lote y combinacion determinista por indice
-de lote para reducir sensibilidad al orden de finalizacion de procesos concurrentes. Tambien
+de lote para reducir sensibilidad al orden de finalizacion de procesos concurrentes. El experimento
+de reproducibilidad v1.2.0 verifico que, con modelo, semilla, iteraciones y particion fijos,
+los resultados numericos canonizados fueron identicos con 1, 2 y 4 workers en los cuatro
+modelos analiticos evaluados. Tambien
 reporta metadatos de reproducibilidad, tasas de validos/descartes, intervalos Wilson y un
 bloque `paired` cuando el modelo contiene `\pm`.

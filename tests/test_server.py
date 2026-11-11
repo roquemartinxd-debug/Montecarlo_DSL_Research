@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
@@ -40,6 +41,19 @@ def test_health_endpoint() -> None:
         response = client.get("/api/health")
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
+
+
+def test_lifespan_shuts_down_job_manager_once(monkeypatch) -> None:
+    """The ASGI lifespan is the single owner of JobManager shutdown."""
+    manager = JobManager(batch_size=100, max_workers=1)
+    shutdown_mock = AsyncMock(wraps=manager.shutdown)
+    monkeypatch.setattr(manager, "shutdown", shutdown_mock)
+
+    with TestClient(create_app(manager)) as client:
+        assert client.get("/api/health").status_code == 200
+        shutdown_mock.assert_not_awaited()
+
+    shutdown_mock.assert_awaited_once()
 
 
 def test_compilation_failure_returns_structured_diagnostics() -> None:

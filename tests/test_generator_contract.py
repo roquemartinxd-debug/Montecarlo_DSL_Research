@@ -26,6 +26,8 @@ def run_generated(
     batch_size: int = 20,
     max_workers: int = 2,
     histogram_bins: int = 12,
+    task_completion_order: str = "as_completed",
+    task_delay_first_seconds: float = 0.0,
 ):
     script = generate_source(
         source,
@@ -34,6 +36,8 @@ def run_generated(
             batch_size=batch_size,
             max_workers=max_workers,
             histogram_bins=histogram_bins,
+            task_completion_order=task_completion_order,
+            task_delay_first_seconds=task_delay_first_seconds,
         ),
     )
     tmp_path.mkdir(parents=True, exist_ok=True)
@@ -188,15 +192,33 @@ def test_generator_contract_each_batch_event_histogram_matches_accumulated_valid
 \uniform a{-1,1}
 \iter{90}
 \response{avg}"""
-    _, completed, messages = run_generated(tmp_path, source, seed=15, batch_size=30)
-    assert completed.returncode == 0, completed.stderr
-    batch_messages = [m for m in messages if m["type"] == "batch"]
-    assert batch_messages
-    for message in batch_messages:
-        assert message["histogram"]["total_count"] == message["valid_results"]
-        assert message["valid_results"] + message["discarded_results"] == (
-            message["processed_iterations"]
+    finals = []
+    # Probamos explicitamente 'as_completed', 'reverse' y 'shuffled' cuando un bloque logico (90)
+    # se divide en 3 tareas fisicas de 30 iteraciones, verificando que cuando la tarea final [60,90)
+    # llega antes que las intermedias, el histograma de progreso refleja solo las tareas completadas.
+    for order in ("as_completed", "reverse", "shuffled", "delayed_first"):
+        _, completed, messages = run_generated(
+            tmp_path / order,
+            source,
+            seed=15,
+            batch_size=30,
+            task_completion_order=order,
+            task_delay_first_seconds=0.05 if order == "delayed_first" else 0.0,
         )
+        assert completed.returncode == 0, completed.stderr
+        batch_messages = [m for m in messages if m["type"] == "batch"]
+        assert len(batch_messages) == 3
+        for message in batch_messages:
+            assert message["histogram"]["total_count"] == message["valid_results"]
+            assert sum(b["count"] for b in message["histogram"]["bins"]) == message["valid_results"]
+            assert message["valid_results"] + message["discarded_results"] == (
+                message["processed_iterations"]
+            )
+        finals.append(messages[-1])
+
+    # Y el evento terminal 'complete' conserva reproducibilidad canonica exacta en todos los ordenes
+    assert all(final["stats"] == finals[0]["stats"] for final in finals[1:])
+    assert all(final["histogram"] == finals[0]["histogram"] for final in finals[1:])
 
 
 def test_generator_contract_generated_script_includes_windows_process_safety_hook():
@@ -207,6 +229,43 @@ def test_generator_contract_generated_script_includes_windows_process_safety_hoo
     script = generate_source(source, GeneratorConfig(seed=1))
     assert "multiprocessing.freeze_support()" in script
     assert 'if __name__ == "__main__":' in script
+    assert "try:\n    import resource\nexcept ImportError" in script
+
+
+def test_generator_contract_multiprocess_results_use_bounded_canonical_reorder_window(tmp_path):
+    source = r"""\model{x=a}
+\normal a{0,1}
+\iter{12000}
+\response{avg,count}"""
+    _, completed, messages = run_generated(
+        tmp_path,
+        source,
+        seed=912,
+        batch_size=2000,
+        max_workers=2,
+    )
+    assert completed.returncode == 0, completed.stderr
+    final = messages[-1]
+    assert final["valid_results"] == 12000
+    assert final["histogram"]["total_count"] == 12000
+    assert final["metadata"]["use_process_pool"] is True
+    assert final["metadata"]["max_in_flight_tasks"] == 4
+    assert final["metadata"]["task_result_ingestion_order"] == "canonical_submission_order"
+
+    _, reverse_completed, reverse_messages = run_generated(
+        tmp_path / "reverse",
+        source,
+        seed=912,
+        batch_size=2000,
+        max_workers=2,
+        task_completion_order="reverse",
+    )
+    assert reverse_completed.returncode == 0, reverse_completed.stderr
+    reverse_final = reverse_messages[-1]
+    assert reverse_final["stats"] == final["stats"]
+    assert reverse_final["histogram"] == final["histogram"]
+    assert reverse_final["metadata"]["task_submission_order"] == "reverse"
+    assert reverse_final["metadata"]["task_result_ingestion_order"] == "canonical_submission_order"
 
 
 def test_generator_contract_default_seed_is_nonnegative_128_bit_integer():
@@ -269,3 +328,61 @@ def test_generator_contract_valid_extreme_but_representable_small_float_is_accep
 \response{{avg}}"""
     script = generate_source(source, GeneratorConfig(seed=1))
     assert "1e-300" in script
+
+
+def test_generated_script_embeds_constant_size_task_generation_config_not_task_list():
+    source = r"""\model{x=a}
+\normal a{0,1}
+\iter{1000000}
+\response{avg}"""
+    script = generate_source(
+        source,
+        GeneratorConfig(
+            seed=1,
+            batch_size=1,
+            logical_block_size=1,
+            max_workers=4,
+            scheduler_mode="fixed",
+        ),
+    )
+    assert "STATIC_TASK_GENERATION = {" in script
+    assert "STATIC_SCHEDULE_TASKS = [" not in script
+    assert "def iter_runtime_schedule_tasks(" in script
+    assert len(script) < 250_000
+
+
+@pytest.mark.parametrize("scheduler_mode", ["fixed", "ast_only"])
+def test_static_schedule_modes_execute_from_lazy_task_generation(tmp_path, scheduler_mode):
+    source = r"""\model{x=a}
+\normal a{0,1}
+\iter{53}
+\response{avg,count}"""
+    script = generate_source(
+        source,
+        GeneratorConfig(
+            seed=72,
+            batch_size=20,
+            logical_block_size=10,
+            max_workers=2,
+            scheduler_mode=scheduler_mode,
+        ),
+    )
+    script_path = tmp_path / f"static_{scheduler_mode}.py"
+    script_path.write_text(script, encoding="utf-8")
+    completed = subprocess.run(
+        [sys.executable, str(script_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+    prefix = "MC_DSL_EVENT:"
+    events = [
+        json.loads(line[len(prefix):])
+        for line in completed.stdout.splitlines()
+        if line.startswith(prefix)
+    ]
+    assert completed.returncode == 0, completed.stderr
+    assert events[0]["batch_count"] == len([event for event in events if event["type"] == "batch"])
+    assert events[-1]["processed_iterations"] == 53
+    assert events[-1]["valid_results"] == 53

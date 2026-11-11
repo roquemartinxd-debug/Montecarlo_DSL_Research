@@ -120,9 +120,15 @@ El runtime divide `TOTAL_ITERATIONS` en lotes de `BATCH_SIZE` y usa:
 
 `workers = min(MAX_WORKERS, numero_de_lotes)`
 
-Cada lote obtiene una semilla determinista derivada de `MASTER_SEED` y de su indice
-mediante BLAKE2b. Los lotes se ejecutan con `ProcessPoolExecutor` y se integran de
-manera determinista por indice para las operaciones globales sensibles al orden.
+Cada lote obtiene una secuencia determinista mediante
+`numpy.SeedSequence([MASTER_SEED, batch_index])`. La identidad del worker no forma parte
+de la semilla. Los lotes se ejecutan con `ProcessPoolExecutor` y sus estados estadisticos
+se integran de manera determinista por `batch_index` para las operaciones globales
+sensibles al orden. El experimento de reproducibilidad v1.2.0 confirmo igualdad exacta
+del resultado numerico canonizado entre 1, 2 y 4 workers para los cuatro modelos
+analiticos evaluados, manteniendo fija la particion en lotes. Cambiar `batch_size` puede
+cambiar la realizacion aleatoria y debe considerarse parte de la configuracion
+reproducible.
 
 ## 9. Protocolo subproceso -> backend
 

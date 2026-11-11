@@ -71,8 +71,9 @@ class _MutableSymbol:
 class SemanticAnalyzer:
     """Analisis semantico en tres pasadas y construccion de tabla de simbolos."""
 
-    def __init__(self, program: ProgramNode):
+    def __init__(self, program: ProgramNode, *, max_iterations: int = _MAX_ITERATIONS):
         self.program = program
+        self.max_iterations = max_iterations
         self.diagnostics: list[Diagnostic] = []
         self._symbols: dict[str, _MutableSymbol] = {}
         self._distribution_nodes: dict[str, list[DistributionNode]] = {}
@@ -340,10 +341,10 @@ class SemanticAnalyzer:
             return
 
         value = iterations.value
-        if value < 1 or value > _MAX_ITERATIONS:
+        if value < 1 or value > self.max_iterations:
             self._add(
                 "SEM021",
-                f"\\iter debe estar entre 1 y {_MAX_ITERATIONS}.",
+                f"\\iter debe estar entre 1 y {self.max_iterations}.",
                 iterations.span,
             )
 
@@ -454,9 +455,9 @@ class SemanticAnalyzer:
         )
 
 
-def analyze(program: ProgramNode) -> ValidatedProgram:
-    return SemanticAnalyzer(program).analyze()
+def analyze(program: ProgramNode, *, max_iterations: int = _MAX_ITERATIONS) -> ValidatedProgram:
+    return SemanticAnalyzer(program, max_iterations=max_iterations).analyze()
 
 
-def analyze_source(source: str) -> ValidatedProgram:
-    return analyze(parse(source))
+def analyze_source(source: str, *, max_iterations: int = _MAX_ITERATIONS) -> ValidatedProgram:
+    return analyze(parse(source), max_iterations=max_iterations)
