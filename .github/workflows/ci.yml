@@ -2,7 +2,7 @@ name: Monte Carlo DSL CI
 
 on:
   push:
-    branches: ["main", "master", "experiment/**"]
+    branches: ["main", "master", "experiment/**", "paper1-v1.3.1-candidate", "paper1-final-freeze"]
   pull_request:
 
 jobs:
